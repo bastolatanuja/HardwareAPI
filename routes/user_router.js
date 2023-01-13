@@ -1,0 +1,85 @@
+const express = require('express')
+const Student = require('../models/User')
+const  bcrypt = require('bcryptjs')
+const jwt = require('jsonwebtoken')
+const User = require('../models/User')
+
+const router = express.Router()
+
+
+
+router.post('/register',(req,res,next) => {
+    User.findOne({username: req.body.username})
+    .then(user => {
+        if(user != null){
+            let err = new Error(`Username ${req.body.username} already registered`)
+            res.status(400)
+            return next(err)
+        }
+         bcrypt.hash(req.body.password, 10,(err,hash) => {
+            if(err) return next(err)
+            user = new User ()
+            user.username = req.body.username
+            user.fname = req.body.fname
+            user.lname = req.body.lname
+            user.password = hash
+            if(req.body.role)user.role = req.body.role
+            user.save().then(user => {
+                res.status(201).json({
+                    status:'User registration success',
+                    userId: user._id,
+                    username: user.username,
+                    fname: user.fname,
+                    lname:user.lname,
+                    gender:user.gender,
+                    role: user.role
+
+                })
+            }).catch(next)
+         })
+    }).catch(next)
+})
+
+router.post('/login',(req,res,next) =>{
+    User.findOne({username:req.body.username})
+    .then(user => {
+        if(user == null){
+            let err = new Error('User is not registered.')
+            res.status(400)
+            return next(err)
+        }
+
+        bcrypt.compare(req.body.password, user.password,
+            (err,success) => {
+                if (err) return next(err)
+
+                if (!success){
+                    let err = new Error('Password doesnot match')
+                    return next(err)
+                }
+                let data = {
+                    userId: user._id,
+                    username:user.username,
+                    fname : user.fname,
+            lname : user.lname
+                   // role:user.role
+                }
+                
+                
+                jwt.sign(data, process.env.SECRET, {expiresIn:'1d'},
+                (err,token) => {
+                    if(err) return next(err)
+                    res.json({
+                        status: 'login Successful',
+                        token: token
+                    })
+
+                    
+                })
+
+
+            })
+    }).catch(next)
+})
+
+module.exports = router
